@@ -90,3 +90,24 @@ Windows: replace `python3` with `py -3`.
 
 **中文：** 本项目已进行静态、离线参数和跨平台逻辑模拟测试，但不能在这里实测所有系统的桌面窗口或在线API请求。  
 **English:** Static checks, offline argument tests and platform-logic simulations have been run. Desktop operation on each target OS and online API performance have **not** been verified here.
+
+## 6. 网络断线自动恢复 / Transient network recovery
+
+**中文：** 如果服务器在接收评论响应时断开连接（如 `ConnectionResetError: [Errno 54]` 或 `IncompleteRead`），引擎现在会针对**同一API请求**最多尝试5次，并采用有上限的递增等待。日志会显示 `API attempt 1/5`。重试耗尽时返回明确的采集错误，不会把失败页面当作空结果，也不会悄悄跳过日期。HTTP 403等非暂时性拒绝不会被反复重试。当前版本**没有跨次运行的断点续采功能**：如果采集中断，请检查现有输出文件，防止重复采集或覆盖。
+
+**English:** If the connection is reset mid-response (`ConnectionResetError`, `IncompleteRead`, etc.), the engine retries the **same API request** up to five times with bounded exponential delays and prints `API attempt 1/5` to the log. An exhausted retry returns an explicit error instead of counting a failed page as empty or silently skipping a day. Permanent 403 responses are not retried. **Resume across application restarts is not implemented**; inspect existing output files before rerunning to avoid duplicates or overwriting.
+
+**Offline regression test / 离线回归测试:**
+```bash
+python3 -m unittest -v test_connection_recovery.py
+```
+
+
+## Auto-generated window selector / 自动生成窗口选项
+
+**中文：**「采集窗口（自动计算）」现在是下拉框。根据开始日期、结束日期、窗口长度、窗口目标采样数及最后不足窗口策略自动计算区间。选择「全部窗口（默认）」执行整个范围，或选择任意编号窗口只运行该窗口；无需手动输入 `--only-period`。修改这些参数时，下拉列表即时更新；若选中的窗口已不存在，将自动恢复「全部窗口」。最后不足窗口也单独显示实际天数和目标数量。
+
+**English:** The **Collection window (auto-generated)** dropdown lists all inclusive, consecutive date ranges computed from the start/end dates, window length, sample target, and partial-window policy. Choose **All windows (default)** or one numbered window. The dropdown refreshes when these inputs change, preserves a still-valid selection, and falls back to All windows when a selected range no longer exists. The final partial range shows its actual days and adjusted target. The generated CLI still uses the engine's existing `--only-period` argument.
+
+### Window selector examples / 窗口示例
+For 2022-05-01 through 2026-11-20 with 180-day windows and a target of 180 per full window, the selector displays 10 windows. The last entry is 2026-10-07 through 2026-11-20 (45 days; target 45 using the proportional policy). / 当日期为2022-05-01至2026-11-20、窗口长度180天、目标每窗口180条时，下拉框会给出10个窗口，最后一个窗口为2026-10-07至2026-11-20（45天；比例采样目标45条）。

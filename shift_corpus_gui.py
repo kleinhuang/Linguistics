@@ -85,8 +85,9 @@ I18N = {
         'subreddit': 'Subreddit', 'seed': '随机种子 Seed', 'after': '开始日期（含）',
         'before': '结束日期（含）', 'period_days': '窗口长度（天）',
         'sample_per_period': '每完整窗口评论数', 'min_words': '最少词数',
-        'partial_policy': '最后不足窗口', 'only_period': '仅采集指定窗口（可留空）',
-        'only_hint': '例如 2022-05-01_2022-10-27，适用于快速复测 pilot',
+        'partial_policy': '最后不足窗口', 'only_period': '采集窗口（自动计算）',
+        'all_windows': '全部窗口（默认）', 'window_option': '{index:02d} · {start} — {end}（{days}天，目标{target}条）',
+        'only_hint': '更改起止日期或窗口长度后自动更新；最后不足窗口也会列出。',
         'english': '仅保留英文评论', 'exclude_bots': '过滤已知 Bot 账号',
         'exclude_nsfw': '过滤 NSFW 标记', 'near_dup': '去掉近重复文本',
         'with_posts': '保存关联帖子标题作为上下文（不计入词频）',
@@ -125,8 +126,9 @@ I18N = {
         'subreddit': 'Subreddit', 'seed': 'Random seed', 'after': 'Start date (inclusive)',
         'before': 'End date (inclusive)', 'period_days': 'Window length (days)',
         'sample_per_period': 'Comments per full window', 'min_words': 'Minimum words',
-        'partial_policy': 'Partial-window policy', 'only_period': 'Single window (optional)',
-        'only_hint': 'e.g. 2022-05-01_2022-10-27, to rerun the pilot',
+        'partial_policy': 'Partial-window policy', 'only_period': 'Collection window (auto-generated)',
+        'all_windows': 'All windows (default)', 'window_option': '{index:02d} · {start} — {end} ({days} days, target {target})',
+        'only_hint': 'Updates with dates or window length; includes the final partial window.',
         'english': 'English comments only', 'exclude_bots': 'Exclude known bots',
         'exclude_nsfw': 'Exclude NSFW content', 'near_dup': 'Remove near duplicates',
         'with_posts': 'Save parent post titles as context (excluded from frequency counts)',
@@ -185,6 +187,26 @@ def estimate_windows(start: str, end: str, period_days: int, quota: int, policy:
     return windows, target, total
 
 
+def build_window_options(start: str, end: str, days: int, quota: int, policy: str):
+    """Use precisely the same inclusive date boundaries as engine.period_windows()."""
+    a, b = check_dates(start, end)
+    if not 1 <= days <= 3650 or not 1 <= quota <= 20000:
+        raise ValueError('参数超出范围：窗口1–3650天、配额1–20000、Seed非负、最低词数0–10000')
+    if policy not in ('proportional', 'full'):
+        raise ValueError('最后窗口策略必须为proportional或full')
+    result = []
+    cursor = a
+    while cursor <= b:
+        stop = min(cursor + timedelta(days=days - 1), b)
+        actual_days = (stop - cursor).days + 1
+        target = quota if actual_days == days or policy == 'full' else max(1, round(quota * actual_days / days))
+        result.append({'id': f'{cursor.isoformat()}_{stop.isoformat()}',
+                       'start': cursor.isoformat(), 'end': stop.isoformat(),
+                       'days': actual_days, 'target': target})
+        cursor = stop + timedelta(days=1)
+    return result
+
+
 def make_command(v: dict[str, object], engine: Path = ENGINE) -> list[str]:
     subreddit = str(v['subreddit']).strip().removeprefix('r/')
     if not re.fullmatch(r'[A-Za-z0-9_]{2,50}', subreddit):
@@ -220,8 +242,9 @@ def make_command(v: dict[str, object], engine: Path = ENGINE) -> list[str]:
     only = str(v.get('only_period') or '').strip()
     if only:
         # Must correspond to the window's ID, e.g. 2022-05-01_2022-10-27.
-        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2}', only):
-            raise ValueError('单窗口格式应为 YYYY-MM-DD_YYYY-MM-DD')
+        valid_ids = {row['id'] for row in build_window_options(a.isoformat(), b.isoformat(), days, count, policy)}
+        if only not in valid_ids:
+            raise ValueError('选中的窗口不属于当前日期范围或窗口长度')
         cmd.extend(['--only-period', only])
     return cmd
 
@@ -248,8 +271,11 @@ class App(tk.Tk):
         self._style()
         self._variables()
         self._layout()
+        for key in ('after', 'before', 'period_days', 'sample_per_period', 'partial_policy'):
+            self.vars[key].trace_add('write', lambda *_: self._refresh_window_options())
         for variable in self.vars.values():
             variable.trace_add('write', lambda *_: self._update_preview())
+        self._refresh_window_options()
         self._update_preview()
         self.after(120, self._poll)
         self.protocol('WM_DELETE_WINDOW', self._close)
@@ -273,6 +299,7 @@ class App(tk.Tk):
             self.outer.destroy()
         self.title(self.t('window_title'))
         self._layout()
+        self._refresh_window_options()
         self.progress.configure(value=old_progress)
         if old_logs:
             self._log(old_logs)
@@ -321,6 +348,8 @@ class App(tk.Tk):
                         partial_policy='proportional', only_period='',
                         out=str(user_output_dir()))
         self.vars: dict[str, tk.Variable] = {k: tk.StringVar(value=v) for k,v in defaults.items()}
+        self.window_choice = tk.StringVar(value='')
+        self.window_label_to_id = {}
         for k in ['english', 'exclude_bots', 'exclude_nsfw', 'near_dup', 'with_posts']:
             self.vars[k] = tk.BooleanVar(value=True)
         self.status_key = 'ready'
@@ -421,8 +450,44 @@ class App(tk.Tk):
         only = tk.Frame(frame,bg=WHITE)
         only.grid(row=2,column=0,columnspan=2,sticky='ew',padx=16,pady=(3,14))
         ttk.Label(only,text=self.t('only_period'),style='WhiteMuted.TLabel').pack(anchor='w',pady=(0,4))
-        ttk.Entry(only,textvariable=self.vars['only_period']).pack(fill='x')
+        self.window_combo = ttk.Combobox(only, textvariable=self.window_choice, state='readonly')
+        self.window_combo.pack(fill='x')
+        self.window_combo.bind('<<ComboboxSelected>>', self._on_window_selected)
         ttk.Label(only,text=self.t('only_hint'),style='WhiteMuted.TLabel').pack(anchor='w',pady=(4,0))
+
+    def _refresh_window_options(self):
+        """Recompute dropdown without altering other settings or resetting valid selection."""
+        if not hasattr(self, 'window_combo'):
+            return
+        old_id = self.vars['only_period'].get()
+        all_label = self.t('all_windows')
+        labels = [all_label]
+        mapping = {all_label: ''}
+        try:
+            windows = build_window_options(
+                self.vars['after'].get(), self.vars['before'].get(),
+                int(self.vars['period_days'].get()),
+                int(self.vars['sample_per_period'].get()),
+                self.vars['partial_policy'].get())
+            for i, row in enumerate(windows, start=1):
+                label = self.t('window_option', index=i, **{k: row[k] for k in ('start', 'end', 'days', 'target')})
+                labels.append(label)
+                mapping[label] = row['id']
+            chosen = next((label for label, period_id in mapping.items() if period_id == old_id), all_label)
+            if old_id and old_id not in mapping.values():
+                self.vars['only_period'].set('')
+            self.window_combo.configure(values=labels, state='readonly')
+            self.window_choice.set(chosen)
+        except (ValueError, OverflowError):
+            # While the user edits a date or number, keep the chooser safe and disabled.
+            self.window_combo.configure(values=[all_label], state='disabled')
+            self.window_choice.set(all_label)
+        self.window_label_to_id = mapping
+
+    def _on_window_selected(self, _event=None):
+        selected = self.window_label_to_id.get(self.window_choice.get(), '')
+        self.vars['only_period'].set(selected)
+        self._update_preview()
 
     def _right(self, frame):
         ttk.Label(frame,text=self.t('filters'),style='White.TLabel',font=(ui_font(),12,'bold')).pack(anchor='w',padx=16,pady=(14,10))
@@ -450,6 +515,10 @@ class App(tk.Tk):
             cmd = make_command(values)
             text = command_preview(cmd)
             windows,target,days=estimate_windows(values['after'],values['before'],int(values['period_days']),int(values['sample_per_period']),values['partial_policy'])
+            selected_id = str(values.get('only_period') or '').strip()
+            if selected_id:
+                chosen = next(row for row in build_window_options(values['after'], values['before'], int(values['period_days']), int(values['sample_per_period']), values['partial_policy']) if row['id'] == selected_id)
+                windows, days, target = 1, chosen['days'], chosen['target']
             info=self.t('estimated', windows=windows, days=days, target=target)
         except (ValueError, KeyError) as exc:
             text=self.t('invalid_params', error=self.error(exc))

@@ -101,3 +101,13 @@ Windows: replace `python3` with `py -3`.
 ```bash
 python3 -m unittest -v test_connection_recovery.py
 ```
+
+
+## Auto-generated window selector / 自动生成窗口选项
+
+**中文：**「采集窗口（自动计算）」现在是下拉框。根据开始日期、结束日期、窗口长度、窗口目标采样数及最后不足窗口策略自动计算区间。选择「全部窗口（默认）」执行整个范围，或选择任意编号窗口只运行该窗口；无需手动输入 `--only-period`。修改这些参数时，下拉列表即时更新；若选中的窗口已不存在，将自动恢复「全部窗口」。最后不足窗口也单独显示实际天数和目标数量。
+
+**English:** The **Collection window (auto-generated)** dropdown lists all inclusive, consecutive date ranges computed from the start/end dates, window length, sample target, and partial-window policy. Choose **All windows (default)** or one numbered window. The dropdown refreshes when these inputs change, preserves a still-valid selection, and falls back to All windows when a selected range no longer exists. The final partial range shows its actual days and adjusted target. The generated CLI still uses the engine's existing `--only-period` argument.
+
+### Window selector examples / 窗口示例
+For 2022-05-01 through 2026-11-20 with 180-day windows and a target of 180 per full window, the selector displays 10 windows. The last entry is 2026-10-07 through 2026-11-20 (45 days; target 45 using the proportional policy). / 当日期为2022-05-01至2026-11-20、窗口长度180天、目标每窗口180条时，下拉框会给出10个窗口，最后一个窗口为2026-10-07至2026-11-20（45天；比例采样目标45条）。
