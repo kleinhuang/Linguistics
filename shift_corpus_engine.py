@@ -20,7 +20,9 @@ _CA_SOURCE = configure_ca()  # inherited by collector subprocess; verification s
 import argparse
 import csv
 import hashlib
+import http.client
 import json
+import socket
 import random
 import re
 import sys
@@ -233,10 +235,28 @@ def friendly(message: str, status: int | None) -> str:
     return message or "Arctic Shift 请求失败"
 
 
+# A TLS connection may succeed while the peer resets the socket as the response
+# body is being read. Those are transient transport failures, not empty samples.
+TRANSIENT_TRANSPORT_ERRORS = (
+    urllib.error.URLError,
+    TimeoutError,
+    ConnectionError,
+    http.client.IncompleteRead,
+    http.client.HTTPException,
+    socket.timeout,
+    json.JSONDecodeError,
+)
+
+
+def retry_pause(attempt: int, rate_limit_delay: float = 0.0) -> None:
+    """Bounded exponential retry with small deterministic jitter-free delays."""
+    time.sleep(max(rate_limit_delay, min(12.0, 1.2 * 2 ** attempt)))
+
+
 def fetch_page(params: list[tuple[str, str]], delay_on_limit: float) -> list[dict]:
     url = API + "?" + urllib.parse.urlencode(params)
     last = "Arctic Shift 没有返回结果"
-    for attempt in range(3):
+    for attempt in range(5):
         req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=30) as res:
@@ -249,28 +269,28 @@ def fetch_page(params: list[tuple[str, str]], delay_on_limit: float) -> list[dic
             except json.JSONDecodeError:
                 message = detail or f"HTTP {exc.code}"
             message = friendly(message, exc.code)
-            retry = exc.code in {408, 422, 429, 500, 502, 503, 504} and attempt < 2
+            retry = exc.code in {408, 422, 429, 500, 502, 503, 504} and attempt < 4
             if not retry:
                 raise ApiError(message, exc.code) from exc
             last = message
-            time.sleep(delay_on_limit if exc.code == 429 else 0.8 * (attempt + 1))
+            retry_pause(attempt, delay_on_limit if exc.code == 429 else 0.0)
             continue
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        except TRANSIENT_TRANSPORT_ERRORS as exc:
             # Preserve the underlying cause: DNS, SSL, proxy, timeouts, or invalid JSON.
             last = f"Arctic Shift 请求失败 ({type(exc).__name__}): {exc}"
-            print(f"  API attempt {attempt + 1}/3: {last}", file=sys.stderr)
-            if attempt < 2:
-                time.sleep(0.8 * (attempt + 1))
+            print(f"  API attempt {attempt + 1}/5: {last}", file=sys.stderr)
+            if attempt < 4:
+                retry_pause(attempt)
                 continue
             raise ApiError(last) from exc
         if not isinstance(payload, dict):
             raise ApiError("返回格式无法识别")
         if payload.get("error"):
             message = friendly(str(payload["error"]), None)
-            if "超时" in message or attempt == 2:
+            if "超时" in message or attempt == 4:
                 raise ApiError(message)
             last = message
-            time.sleep(0.8 * (attempt + 1))
+            retry_pause(attempt)
             continue
         data = payload.get("data")
         if not isinstance(data, list):
@@ -642,7 +662,7 @@ def slim_post(raw: dict) -> dict | None:
 def fetch_post_batch(ids: list[str], delay_on_limit: float) -> list[dict]:
     url = POST_API + "?ids=" + ",".join(ids)
     last = "Arctic Shift 没有返回帖子"
-    for attempt in range(3):
+    for attempt in range(5):
         req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=30) as res:
@@ -650,15 +670,16 @@ def fetch_post_batch(ids: list[str], delay_on_limit: float) -> list[dict]:
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
             message = friendly(detail[:180], exc.code)
-            if exc.code not in {408, 422, 429, 500, 502, 503, 504} or attempt == 2:
+            if exc.code not in {408, 422, 429, 500, 502, 503, 504} or attempt == 4:
                 raise ApiError(message, exc.code) from exc
             last = message
-            time.sleep(delay_on_limit if exc.code == 429 else 0.8 * (attempt + 1))
+            retry_pause(attempt, delay_on_limit if exc.code == 429 else 0.0)
             continue
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-            if attempt == 2:
-                raise ApiError("连不上 Arctic Shift，或帖子返回无法解析。") from exc
-            time.sleep(0.8 * (attempt + 1))
+        except TRANSIENT_TRANSPORT_ERRORS as exc:
+            print(f"  post API attempt {attempt + 1}/5: {type(exc).__name__}: {exc}", file=sys.stderr)
+            if attempt == 4:
+                raise ApiError(f"Arctic Shift 帖子请求连续失败: {type(exc).__name__}: {exc}") from exc
+            retry_pause(attempt)
             continue
         data = payload.get("data") if isinstance(payload, dict) else None
         if not isinstance(data, list):
