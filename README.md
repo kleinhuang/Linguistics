@@ -1,2 +1,2 @@
-# Linguisitic
-some useful linguistic programs that I made while studing
+# Linguistics
+Some useful linguistic programs that I made while studying
