@@ -2,7 +2,7 @@
 
 ## English
 
-This project lives inside the multi-project repository `kleinhuang/Linguisitic`.
+This project lives inside the multi-project repository `kleinhuang/Linguistics`.
 
 **Already published to `main`:**
 - `ShiftCorpus-GUI/README.md`
@@ -17,7 +17,7 @@ A separate publishing kit was prepared for the project. To publish the archived 
 ```bash
 brew install gh                 # macOS, if needed
 gh auth login
-bash publish_to_existing_linguisitic.sh kleinhuang/Linguisitic
+bash publish_to_existing_linguistics.sh kleinhuang/Linguistics
 ```
 
 The script creates the separate `shiftcorpus-history` branch, pushes prefixed tags such as `shiftcorpus-v1.1.1`, and creates ten bilingual GitHub Releases. It does not force-push or overwrite `main`.
@@ -28,7 +28,7 @@ The script creates the separate `shiftcorpus-history` branch, pushes prefixed ta
 
 ## 中文
 
-该项目位于多项目仓库 `kleinhuang/Linguisitic`。
+该项目位于多项目仓库 `kleinhuang/Linguistics`。
 
 **已经上传到 `main`：** `ShiftCorpus-GUI/` 内的双语README、CHANGELOG、版本历史和本发布说明。
 
@@ -37,7 +37,7 @@ The script creates the separate `shiftcorpus-history` branch, pushes prefixed ta
 为了不覆盖已有 `main` 分支，可以在Mac终端安装GitHub CLI，执行 `gh auth login` 后，在此前准备的发布包目录运行：
 
 ```bash
-bash publish_to_existing_linguisitic.sh kleinhuang/Linguisitic
+bash publish_to_existing_linguistics.sh kleinhuang/Linguistics
 ```
 
 脚本将代码发布到独立的 `shiftcorpus-history` 分支，并用 `shiftcorpus-v1.1.1` 等标签建立十个双语Release。不会强制推送覆盖 `main`。
