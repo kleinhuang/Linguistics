@@ -1,83 +1,79 @@
-# ShiftCorpus GUI — 使用说明 / User Guide
+# ShiftCorpus GUI — 跨平台版 / Cross-platform Edition
 
-**中文 / English:** 在应用右上角的 **语言 / Language** 下拉菜单选择 **中文** 或 **English**。切换会立即更新图形界面文字，不会清空已设置的参数；运行日志中的采集引擎原始输出仍保持原文，便于核对问题。
+**适用系统 / Supported:** macOS, Windows 10/11, Linux desktops (GNOME, KDE, etc.). **Python 3.10+** and **Tkinter** required. This is a portable **Python source app**, **not** a signed `.app`, `.exe`, or Linux binary. Internet access is needed for Arctic Shift collection.
 
-**中文：** 这是一款用于从 Arctic Shift 收集 Reddit 评论的桌面图形界面，支持 macOS（也可在有 Tkinter 的其他系统运行）。GUI 调用随包附带的 Python 采集引擎。  
-**English:** A desktop interface for collecting Reddit comments from Arctic Shift. It targets macOS and can also run on other systems with Tkinter. The GUI launches the bundled Python collection engine.
+**中文：** 同一份程序可在 macOS、Windows 和 Linux 上运行，支持右上角即时切换中文 / English。抽样和清洗引擎保持原样；平台适配只调整图形界面、启动、路径及日志编码。  
+**English:** The same project works across macOS, Windows and Linux. Switch Chinese / English at the upper right. The collection engine and sampling logic are unchanged; platform changes affect launching, GUI compatibility, paths, and log encoding.
 
-## 1. 启动 / Launch
+## 1. 安装 / Requirements
 
-**中文：**
-1. 解压整个 `ShiftCorpus_GUI` 文件夹，不要单独移动 Python 文件。
-2. 在 VS Code 中打开该文件夹，打开终端运行：
-   ```bash
-   python3 shift_corpus_gui.py
-   ```
-3. macOS 也可以尝试双击 `启动采集器.command`。
-4. 如提示缺少 `_tkinter`，请使用含 Tkinter 的 Python 发行版（如 python.org 的 macOS 版本）。
+| 平台 / Platform | 安装 / Install | 启动 / Start |
+|---|---|---|
+| macOS | Install Python 3.10+ from [python.org](https://www.python.org/downloads/) with Tcl/Tk | `python3 shift_corpus_gui.py` or `Launch_macOS.command` |
+| Windows | Install Python 3.10+ from [python.org](https://www.python.org/downloads/windows/); include Tcl/Tk | `py -3 shift_corpus_gui.py` or double-click `Launch_Windows.bat` |
+| Linux (Debian/Ubuntu) | `sudo apt install python3 python3-tk` | `python3 shift_corpus_gui.py` or `./Launch_Linux.sh` |
+| Linux (Fedora) | `sudo dnf install python3 python3-tkinter` | `python3 shift_corpus_gui.py` |
 
-**English:**
-1. Extract the entire `ShiftCorpus_GUI` folder and keep the Python files together.
-2. Open the folder in VS Code and run `python3 shift_corpus_gui.py` in Terminal.
-3. On macOS, you can also try double-clicking `启动采集器.command`.
-4. If `_tkinter` is missing, install a Python distribution with Tkinter support (such as the macOS installer from python.org).
+**中文：** 完整解压 ZIP，保持 `shift_corpus_gui.py` 与 `shift_corpus_engine.py` 在同一目录。不要直接在 ZIP 预览中运行。macOS 如提示安全限制，可从终端运行 `.command` 或直接使用上表的 `python3` 命令；不要关闭系统安全机制。Linux 需要图形桌面及有效的 `DISPLAY`/Wayland 会话。
 
-## 2. 研究预设 / Research defaults
+**English:** Fully extract the ZIP and keep the GUI and engine files together. Do not launch files from within an archive preview. If macOS restricts the launcher, use Terminal and the Python command above. On Linux, launch in a GUI desktop session (not a headless server).
 
-| Setting / 参数 | Default / 默认值 |
+**Check Tkinter / 检查图形组件:**
+```bash
+python3 -m tkinter
+```
+On Windows, use `py -3 -m tkinter` instead.
+
+## 2. 启动器 / Launchers
+
+- `Launch_macOS.command`: macOS desktop launcher; if needed run `bash Launch_macOS.command`.
+- `Launch_Windows.bat`: Windows launcher; picks `py -3` first, then `python`.
+- `Launch_Linux.sh`: Linux desktop launcher; run `bash Launch_Linux.sh`, or `chmod +x Launch_Linux.sh && ./Launch_Linux.sh`.
+
+**中文：** 启动器不会自动安装Python，不会申请管理员权限，也不会改变采集参数。  
+**English:** Launchers do not install Python, require administrator privileges, or change research parameters.
+
+## 3. 功能与研究预设 / Features & defaults
+
+| 参数 / Setting | 默认值 / Default |
 |---|---|
 | Subreddit | `politics` |
-| Start / 开始 | `2022-05-01` (inclusive / 包含当天) |
-| End / 结束 | `2026-11-20` (inclusive / 包含当天) |
-| Window / 窗口 | 180 days / 天 |
-| Quota / 每完整窗口数量 | 180 comments / 条评论 |
+| Start / 开始日期 | `2022-05-01` inclusive |
+| End / 结束日期 | `2026-11-20` inclusive |
+| Window / 时间窗口 | `180` days |
+| Sample / 每完整窗口 | `180` comments |
 | Seed / 随机种子 | `1` |
-| Partial-window policy / 不足窗口处理 | `proportional` (proportional target / 按比例目标) |
-| Filters / 过滤 | English only, bots, NSFW, near-duplicates / 英文、Bot、NSFW、近重复 |
-| Parent post context / 关联帖子上下文 | Enabled / 开启 |
+| Partial window / 不足窗口 | `proportional` |
+| Filters / 过滤 | English, bots, NSFW, near-duplicates (checked) |
+| Parent post context / 标题上下文 | On; titles excluded from main frequency corpus |
 
-**中文：** `proportional` 表示最后一个不满 180 天的窗口按天数比例调整目标；`full` 表示仍使用完整配额。首尾日期采用 UTC。勾选关联帖子上下文会保留帖子标题，但不把帖文正文计入评论词频。
+**中文：** 先点击“测试 API 连接”，成功后先用“仅采集指定窗口”运行 `2022-05-01_2022-10-27`。日志实时显示API异常、窗口和每日采集情况。语言切换不会清除设置与日志。  
+**English:** Click **Test API connection** before collecting, then try a pilot using `2022-05-01_2022-10-27` in the optional single-window field. Logs show API errors and window/day sampling. Switching languages preserves settings and logs.
 
-**English:** `proportional` scales the last incomplete window's target to its length; `full` uses the full quota. Date boundaries use UTC. Enabling parent-post context preserves post titles without including post body text in comment frequency counts.
+**输出位置 / Output directory:** `~/Documents/ShiftCorpus_Output` if Documents exists; otherwise `~/ShiftCorpus_Output`. You can select another directory from the GUI. This avoids writing into read-only installation folders. Files include AntConc `.txt`, `.index.txt`, `.csv`, `.jsonl`, and `query.json` when generated by the engine.
 
-## 3. 操作步骤 / Workflow
+## 4. 网络与错误 / Networking & troubleshooting
 
-**中文：**
-1. 在右上角选择界面语言。
-2. 点击 **测试 API 连接**，验证当前网络和证书设置。
-3. 建议先在 **仅采集指定窗口** 输入 `2022-05-01_2022-10-27`，测试 pilot 窗口。
-4. 点击 **开始采集**，查看实时日志和进度。按钮 **停止** 会终止子进程。
-5. 完成后点击 **打开输出文件夹**。
+**中文：** 对于 `CERTIFICATE_VERIFY_FAILED`，请修复Python的证书配置；macOS的官方Python安装通常提供 `Install Certificates.command`。`HTTP 403` 不等于没有网络连接，先使用GUI测试按钮观察详细报错。Windows/Linux如缺少Tkinter，按上表安装相应组件。  
+**English:** For `CERTIFICATE_VERIFY_FAILED`, repair Python's CA certificates (the macOS python.org installer typically includes `Install Certificates.command`). An `HTTP 403` indicates a server refusal, not necessarily lost connectivity. If Tkinter is missing on Linux/Windows, install it using the platform guidance above.
 
-**English:**
-1. Choose the interface language in the upper-right selector.
-2. Click **Test API connection** to verify network connectivity and certificate trust.
-3. To test the pilot first, enter `2022-05-01_2022-10-27` in **Single window (optional)**.
-4. Click **Start collection** and monitor the live log/progress; **Stop** terminates the subprocess.
-5. Use **Open output folder** to inspect results.
-
-## 4. 输出数据 / Outputs
-
-**中文：** 每个窗口会生成 AntConc 使用的 `.txt`、元数据 `.index.txt`、结构化 `.csv` 和 `.jsonl`，以及记录运行配置与统计信息的 `query.json`。目标数量不等于实际获得数量，检查日志中的 `kept`、`short` 等数字。采集引擎日志可能为英文或中文，切换 GUI 语言不会改写原始日志或数据文件。
-
-**English:** Each window exports an AntConc `.txt`, `.index.txt` metadata, structured `.csv` and `.jsonl`, plus `query.json` with configuration and run statistics. Target quota is not a guarantee; inspect `kept`, `short`, and other logs. Engine-generated logs may remain in their original language; switching UI language does not modify them or the collected data.
-
-## 5. API与SSL排查 / API and SSL troubleshooting
-
-**中文：** 如果看到 `CERTIFICATE_VERIFY_FAILED`，先修复本地 Python 的证书信任配置（python.org 的 Mac 版本可以运行 `Install Certificates.command`）。如果出现 HTTP 403，可先对比 `curl` 与 Python 的请求结果。此版本已对 GUI 连接测试与采集引擎统一设置以下已验证的请求头：
-
-**English:** For `CERTIFICATE_VERIFY_FAILED`, repair Python's local certificate trust store (the python.org macOS installer provides `Install Certificates.command`). For HTTP 403, compare results from `curl` and Python. This release uses the same tested request headers in GUI diagnostics and the collection engine:
-
+**HTTP headers / 请求头** (used by both engine and API test):
 ```http
 User-Agent: ShiftCorpus-Research/1.0 (academic corpus collection)
 Accept: application/json
 ```
 
-**中文：** 服务器限流或返回 5xx 时请检查详细日志。不要关闭 SSL 证书验证。  
-**English:** Check the diagnostic log for server rate limits or 5xx responses. Do not disable SSL verification.
+**注意 / Note:** This app uses the public Arctic Shift service; availability and returned corpus size are not guaranteed. The daily sampling approach is time-stratified, not a uniform random sample of all comments. The **Stop** button may interrupt unwritten data. Do not disable TLS verification.
 
-## 6. 局限与注意事项 / Limitations and notes
+## 5. 源代码验证 / Source tests
 
-**中文：** GUI 不改变采集引擎的基本分层抽样算法，该算法不是对全部评论的严格等概率抽样。应用依赖第三方 Arctic Shift 服务；无法保证每个日期均有数据。点击停止不会保证未写入的数据可以恢复。应用只依赖 Python 标准库，不需要额外 Python 包。
+```bash
+python3 -m py_compile shift_corpus_gui.py shift_corpus_engine.py
+python3 test_gui.py
+python3 test_language.py      # Requires a real display, or xvfb-run on Linux
+python3 test_cross_platform.py
+```
+Windows: replace `python3` with `py -3`.
 
-**English:** The GUI does not change the collector's underlying stratified sampling method, which is not a uniform sample of every eligible comment. Arctic Shift is a third-party service and complete archive coverage is not guaranteed. Stop may interrupt work that has not yet been written to disk. Only Python's standard library is required.
+**中文：** 本项目已进行静态、离线参数和跨平台逻辑模拟测试，但不能在这里实测所有系统的桌面窗口或在线API请求。  
+**English:** Static checks, offline argument tests and platform-logic simulations have been run. Desktop operation on each target OS and online API performance have **not** been verified here.

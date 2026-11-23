@@ -9,6 +9,7 @@ import os
 import queue
 import re
 import shlex
+import platform
 import subprocess
 import sys
 import threading
@@ -22,6 +23,34 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 ROOT = Path(__file__).resolve().parent
 ENGINE = ROOT / "shift_corpus_engine.py"
 API_TEST_URL = "https://arctic-shift.photon-reddit.com/api/comments/search?subreddit=politics&limit=1"
+
+def user_output_dir() -> Path:
+    """Put generated corpora in a user-writable location on every OS."""
+    documents = Path.home() / 'Documents'
+    base = documents if documents.is_dir() else Path.home()
+    return base / 'ShiftCorpus_Output'
+
+
+def command_preview(args: list[str]) -> str:
+    """Display native shell-oriented quoting without affecting subprocess argv."""
+    return subprocess.list2cmdline(args) if os.name == 'nt' else shlex.join(args)
+
+
+def mono_font() -> str:
+    if sys.platform == 'darwin':
+        return 'Menlo'
+    if os.name == 'nt':
+        return 'Consolas'
+    return 'DejaVu Sans Mono'
+
+
+def ui_font() -> str:
+    if sys.platform == 'darwin':
+        return 'Helvetica Neue'
+    if os.name == 'nt':
+        return 'Segoe UI'
+    return 'DejaVu Sans'
+
 
 BG = '#f6f8fb'
 WHITE = '#ffffff'
@@ -200,8 +229,10 @@ class App(tk.Tk):
         self.language = tk.StringVar(value='zh')
         self.language_choice = tk.StringVar(value='中文')
         self.title(self.t('window_title'))
-        self.geometry('1120x820')
-        self.minsize(900, 690)
+        screen_w = self.winfo_screenwidth()
+        screen_h = self.winfo_screenheight()
+        self.geometry(f'{min(1120, max(780, screen_w - 80))}x{min(820, max(620, screen_h - 100))}')
+        self.minsize(min(900, max(780, screen_w - 80)), min(690, max(600, screen_h - 100)))
         self.configure(bg=BG)
         self.queue: queue.Queue[tuple[str, object]] = queue.Queue()
         self.proc: subprocess.Popen | None = None
@@ -260,31 +291,32 @@ class App(tk.Tk):
 
     def _style(self):
         st = ttk.Style(self)
+        main_font = ui_font()
         st.theme_use('clam')
         st.configure('TFrame', background=BG)
         st.configure('White.TFrame', background=WHITE)
-        st.configure('TLabel', background=BG, foreground=INK, font=('Helvetica', 11))
-        st.configure('Muted.TLabel', background=BG, foreground=MUTED, font=('Helvetica', 10))
-        st.configure('White.TLabel', background=WHITE, foreground=INK, font=('Helvetica', 10))
-        st.configure('WhiteMuted.TLabel', background=WHITE, foreground=MUTED, font=('Helvetica', 10))
-        st.configure('Heading.TLabel', background=BG, foreground=INK, font=('Helvetica', 22, 'bold'))
-        st.configure('Subhead.TLabel', background=BG, foreground=INK, font=('Helvetica', 12, 'bold'))
+        st.configure('TLabel', background=BG, foreground=INK, font=(main_font, 11))
+        st.configure('Muted.TLabel', background=BG, foreground=MUTED, font=(main_font, 10))
+        st.configure('White.TLabel', background=WHITE, foreground=INK, font=(main_font, 10))
+        st.configure('WhiteMuted.TLabel', background=WHITE, foreground=MUTED, font=(main_font, 10))
+        st.configure('Heading.TLabel', background=BG, foreground=INK, font=(main_font, 22, 'bold'))
+        st.configure('Subhead.TLabel', background=BG, foreground=INK, font=(main_font, 12, 'bold'))
         st.configure('TEntry', padding=6)
         st.configure('TCombobox', padding=5)
-        st.configure('TCheckbutton', background=WHITE, foreground=INK, font=('Helvetica', 10))
+        st.configure('TCheckbutton', background=WHITE, foreground=INK, font=(main_font, 10))
         st.map('TCheckbutton', background=[('active', WHITE)])
-        st.configure('Primary.TButton', background=ACCENT, foreground='white', padding=(17, 9), font=('Helvetica', 11, 'bold'))
+        st.configure('Primary.TButton', background=ACCENT, foreground='white', padding=(17, 9), font=(main_font, 11, 'bold'))
         st.map('Primary.TButton', background=[('active', '#0e55a4'), ('disabled', '#a2b3c6')])
-        st.configure('Secondary.TButton', padding=(12, 8), font=('Helvetica', 10))
+        st.configure('Secondary.TButton', padding=(12, 8), font=(main_font, 10))
         st.configure('TNotebook', background=BG, borderwidth=0)
-        st.configure('TNotebook.Tab', padding=(20, 10), font=('Helvetica', 10))
+        st.configure('TNotebook.Tab', padding=(20, 10), font=(main_font, 10))
         st.configure('Horizontal.TProgressbar', troughcolor='#e5ebf4', background=ACCENT, borderwidth=0)
 
     def _variables(self):
         defaults = dict(subreddit='politics', after='2022-05-01', before='2026-11-20',
                         period_days='180', sample_per_period='180', seed='1', min_words='5',
                         partial_policy='proportional', only_period='',
-                        out=str((ROOT / 'corpus_output').resolve()))
+                        out=str(user_output_dir()))
         self.vars: dict[str, tk.Variable] = {k: tk.StringVar(value=v) for k,v in defaults.items()}
         for k in ['english', 'exclude_bots', 'exclude_nsfw', 'near_dup', 'with_posts']:
             self.vars[k] = tk.BooleanVar(value=True)
@@ -322,7 +354,7 @@ class App(tk.Tk):
         ttk.Label(command_header, text=self.t('command'), style='Subhead.TLabel').pack(side='left')
         ttk.Button(command_header, text=self.t('copy'), command=self._copy_command).pack(side='right')
         self.command_text = tk.Text(outer, height=3, bg='#eaf0f8', fg=INK,
-                                     font=('Menlo', 10), wrap='word', relief='flat', padx=12, pady=9)
+                                     font=(mono_font(), 10), wrap='word', relief='flat', padx=12, pady=9)
         self.command_text.pack(fill='x')
         self.command_text.configure(state='disabled')
         self.summary_view = ttk.Label(outer, textvariable=self.summary, style='Muted.TLabel')
@@ -351,7 +383,7 @@ class App(tk.Tk):
         ttk.Label(log_head, text=self.t('logs'), style='Subhead.TLabel').pack(side='left')
         ttk.Button(log_head, text=self.t('clear'), command=self._clear_logs).pack(side='right')
         self.logs = scrolledtext.ScrolledText(outer, height=12, bg='#0f1c2e', fg='#d9e5f6',
-                                              insertbackground='white', font=('Menlo', 10),
+                                              insertbackground='white', font=(mono_font(), 10),
                                               wrap='word', padx=12, pady=10, relief='flat', state='disabled')
         self.logs.pack(fill='both', expand=True)
         self.logs.tag_configure('warn', foreground='#ffca89')
@@ -367,7 +399,7 @@ class App(tk.Tk):
     def _left(self, frame):
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_columnconfigure(1, weight=1)
-        ttk.Label(frame, text=self.t('range'), style='White.TLabel', font=('Helvetica', 12, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', padx=16, pady=(14, 6))
+        ttk.Label(frame, text=self.t('range'), style='White.TLabel', font=(main_font, 12, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', padx=16, pady=(14, 6))
         inner = tk.Frame(frame, bg=WHITE)
         inner.grid(row=1, column=0, columnspan=2, sticky='nsew', padx=16)
         inner.grid_columnconfigure(0, weight=1)
@@ -390,7 +422,7 @@ class App(tk.Tk):
         ttk.Label(only,text=self.t('only_hint'),style='WhiteMuted.TLabel').pack(anchor='w',pady=(4,0))
 
     def _right(self, frame):
-        ttk.Label(frame,text=self.t('filters'),style='White.TLabel',font=('Helvetica',12,'bold')).pack(anchor='w',padx=16,pady=(14,10))
+        ttk.Label(frame,text=self.t('filters'),style='White.TLabel',font=(main_font,12,'bold')).pack(anchor='w',padx=16,pady=(14,10))
         for key,text in [
             ('english',self.t('english')),
             ('exclude_bots',self.t('exclude_bots')),
@@ -413,7 +445,7 @@ class App(tk.Tk):
         try:
             values = self._values()
             cmd = make_command(values)
-            text = shlex.join(cmd)
+            text = command_preview(cmd)
             windows,target,days=estimate_windows(values['after'],values['before'],int(values['period_days']),int(values['sample_per_period']),values['partial_policy'])
             info=self.t('estimated', windows=windows, days=days, target=target)
         except (ValueError, KeyError) as exc:
@@ -463,10 +495,17 @@ class App(tk.Tk):
         self.progress.configure(value=0)
         self._log('\n'+'='*57)
         self._log(self.t('launch',time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')),'good')
-        self._log(shlex.join(command))
+        self._log(command_preview(command))
         try:
+            env = os.environ.copy()
+            env['PYTHONIOENCODING'] = 'utf-8'
+            popen_kw = {}
+            if os.name == 'nt':
+                # Keep the GUI free of a second console window on Windows.
+                popen_kw['creationflags'] = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
             self.proc=subprocess.Popen(command,cwd=str(ROOT),stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT,text=True,bufsize=1,errors='replace')
+                           stderr=subprocess.STDOUT,text=True,encoding='utf-8',
+                           bufsize=1,errors='replace',env=env,**popen_kw)
         except OSError as exc:
             self._log(self.t('launch_error',error=exc),'error');return
         self._status('collecting')
@@ -571,9 +610,15 @@ class App(tk.Tk):
     def _open_folder(self):
         path=Path(self.vars['out'].get()).expanduser()
         path.mkdir(parents=True,exist_ok=True)
-        if sys.platform=='darwin': subprocess.Popen(['open',str(path)])
-        elif sys.platform=='win32':os.startfile(str(path))
-        else:subprocess.Popen(['xdg-open',str(path)])
+        try:
+            if sys.platform == 'darwin':
+                subprocess.Popen(['open', str(path)])
+            elif sys.platform == 'win32':
+                os.startfile(str(path))
+            else:
+                subprocess.Popen(['xdg-open', str(path)])
+        except (OSError, FileNotFoundError) as exc:
+            messagebox.showerror(self.t('cannot_create'), str(exc))
 
     def _close(self):
         if self.proc and self.proc.poll() is None:
@@ -585,5 +630,5 @@ class App(tk.Tk):
 if __name__=='__main__':
     try: App().mainloop()
     except tk.TclError as exc:
-        print(f'无法启动Tkinter图形界面：{exc}\n请使用支持桌面的Python 3，Mac建议安装python.org发行版。',file=sys.stderr)
+        print(f'Unable to start the Tkinter graphical interface / 无法启动图形界面: {exc}\nInstall Python 3.10+ with Tk support and run in a graphical desktop session.',file=sys.stderr)
         raise SystemExit(1)
