@@ -1,4 +1,4 @@
-# ShiftCorpus GUI v1.1.0 — 跨平台版 / Cross-platform Edition
+# ShiftCorpus GUI v1.1.1 — 跨平台版 / Cross-platform Edition
 
 **适用系统 / Supported:** macOS, Windows 10/11, Linux desktops (GNOME, KDE, etc.). **Python 3.10+** and **Tkinter** required. This is a portable **Python source app**, **not** a signed `.app`, `.exe`, or Linux binary. Internet access is needed for Arctic Shift collection.
 
@@ -130,3 +130,9 @@ python3 -m unittest -v test_connection_recovery.py
 
 ### Window selector examples / 窗口示例
 For 2022-05-01 through 2026-11-20 with 180-day windows and a target of 180 per full window, the selector displays 10 windows. The last entry is 2026-10-07 through 2026-11-20 (45 days; target 45 using the proportional policy). / 当日期为2022-05-01至2026-11-20、窗口长度180天、目标每窗口180条时，下拉框会给出10个窗口，最后一个窗口为2026-10-07至2026-11-20（45天；比例采样目标45条）。
+
+### v1.1.1 — Output README / 输出说明
+
+The generated `README.txt` inside each newly created collection output folder now contains a complete **English section first**, followed by a complete **Chinese section**. This is produced by the collection engine, regardless of the GUI language setting. Existing output folders are not retroactively rewritten.
+
+每次新采集的输出文件夹中，自动生成的 `README.txt` 现在采用**先英文、后中文**的完整双语说明，与 GUI 语言设置无关。已有采集文件夹不会自动被修改。

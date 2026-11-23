@@ -1,5 +1,10 @@
 # ShiftCorpus GUI — Changelog / 更新日志
 
+## v1.1.1 — Bilingual output README / 输出说明双语化
+- Generate `README.txt` in each new output with English first, Chinese second.
+- Include collection parameters, file descriptions, export counts and warnings in both sections.
+- Preserve sampling, API behavior and output format.
+
 ## v1.1.0 — Run folder archiving / 每次采集独立归档
 - Create a unique, descriptive run folder under the selected output root on each Start.
 - Use subreddit, effective date span, all/single selection, and start timestamp in folder names.

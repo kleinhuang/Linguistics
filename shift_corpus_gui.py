@@ -23,7 +23,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 ROOT = Path(__file__).resolve().parent
 ENGINE = ROOT / "shift_corpus_engine.py"
 API_TEST_URL = "https://arctic-shift.photon-reddit.com/api/comments/search?subreddit=politics&limit=1"
@@ -109,7 +109,7 @@ ERROR_EN = {
 # UI strings only; subprocess output remains verbatim for reproducibility.
 I18N = {
     'zh': {
-        'window_title': 'ShiftCorpus GUI v1.1.0 · Reddit 语料采集器',
+        'window_title': 'ShiftCorpus GUI v1.1.1 · Reddit 语料采集器',
         'subtitle': 'Arctic Shift 研究语料采集 · 可视化参数、连接诊断和实时进度',
         'language': '语言 / Language', 'range': '采集范围与抽样', 'filters': '清洗与输出',
         'subreddit': 'Subreddit', 'seed': '随机种子 Seed', 'after': '开始日期（含）',
@@ -150,7 +150,7 @@ I18N = {
         'argument_error': '输入参数无效：{error}',
     },
     'en': {
-        'window_title': 'ShiftCorpus GUI v1.1.0 · Reddit Corpus Collector',
+        'window_title': 'ShiftCorpus GUI v1.1.1 · Reddit Corpus Collector',
         'subtitle': 'Arctic Shift research collector · Settings, connection diagnostics, and live progress',
         'language': 'Language / 语言', 'range': 'Collection & sampling', 'filters': 'Filters & export',
         'subreddit': 'Subreddit', 'seed': 'Random seed', 'after': 'Start date (inclusive)',

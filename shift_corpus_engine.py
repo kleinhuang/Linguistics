@@ -895,55 +895,121 @@ def write_outputs(rows: list[dict], out: Path, record: dict, flatten: bool, chro
 
 
 def readme(record: dict) -> str:
+    """Generate the per-run README: complete English section, then complete Chinese section."""
     filters = record.get("filters", {})
     result = record.get("result", {})
     files = result.get("files") or []
-    lines = [
-        "Shift Corpus",
-        "============",
+    communities = ", ".join(filters.get("subreddits") or [])
+    communities_en = communities or "(not restricted)"
+    communities_zh = communities or "（未限定）"
+    start = filters.get("after") or "(unrestricted)"
+    end = filters.get("before") or "(unrestricted)"
+    start_zh = filters.get("after") or "不限"
+    end_zh = filters.get("before") or "不限"
+    only = filters.get("onlyPeriod")
+    stratified = bool(filters.get("stratifiedSample"))
+    sample_spec = (
+        f"; target {filters.get('samplePerPeriod')} per full window, "
+        f"daily quotas and randomized retrieval timestamps, seed {filters.get('seed')}"
+        if stratified else ""
+    )
+    sample_spec_zh = (
+        f"；每个完整窗口目标 {filters.get('samplePerPeriod')} 条，按日配额与随机检索时间点，随机种子 {filters.get('seed')}"
+        if stratified else ""
+    )
+    include_posts = bool(filters.get("includePostsInCorpus", False))
+    en = [
+        "ShiftCorpus — Collection Output README",
+        "======================================",
         "",
-        "每个不带 .index 或 .quotes 的 txt 是一个语料库。不要把 README、index、quotes 加进 AntConc。",
-        "同一个 txt 里，文本之间空一行。时间、楼层和 flair 在同名 .index.txt。",
+        "1. About this collection",
+        "------------------------",
+        f"Retrieved at (UTC): {record.get('retrievedAt', '')}",
+        "Data source: Arctic Shift (https://arctic-shift.photon-reddit.com)",
+        f"Subreddit(s): {communities_en}",
+        f"Date range (UTC, inclusive end date): {start} to {end}",
+        f"Maximum kept per segment: {filters.get('maxKeep')}",
+        f"Collect separate time windows: {bool(filters.get('halfFetch'))}",
+        f"Time-stratified sampling: {stratified}{sample_spec}",
+        f"Selected window: {only or 'all windows'}",
+        f"Output split: {filters.get('split') or 'half'}",
+        f"Comments collected: {result.get('comments', 0)}",
+        f"Related posts retrieved: {result.get('posts', 0)}",
+        f"Corpus words exported: {result.get('words', 0)}",
+        f"Include post bodies in corpus: {include_posts} (default: comment bodies only)",
         "",
-        f"检索时间 (UTC): {record.get('retrievedAt', '')}",
-        "数据源: Arctic Shift  https://arctic-shift.photon-reddit.com",
-        f"版块: {', '.join(filters.get('subreddits') or []) or '（未限定）'}",
-        f"日期: {filters.get('after') or '不限'} 至 {filters.get('before') or '不限'}（含结束日，UTC）",
-        f"每段最多保留: {filters.get('maxKeep')}",
-        f"按半年分别检索: {bool(filters.get('halfFetch'))}",
-        f"分层抽样: {bool(filters.get('stratifiedSample'))}"
-        + (
-            f"，每个半年 {filters.get('samplePerPeriod')} 条，按天定额、一天内按钟点各抽 1 条，seed {filters.get('seed')}"
-            if filters.get("stratifiedSample")
-            else ""
-        ),
-        f"只抓: {filters.get('onlyPeriod') or '全部'}",
-        f"切分: {filters.get('split') or 'half'}",
-        f"评论采集: {result.get('comments', 0)}  关联帖子抓取: {result.get('posts', 0)}  导出语料词数: {result.get('words', 0)}",
-        f"导出帖子正文: {bool(filters.get('includePostsInCorpus', False))}；默认只导出评论正文。",
-        "CSV/JSONL 每条记录单独保存，即使评论正文存在空行也可准确对应 ID。",
+        "2. Output files and how to use them",
+        "----------------------------------",
+        "Each primary corpus .txt file contains cleaned documents separated by blank lines.",
+        "Do NOT load README.txt, *.index.txt, or *.quotes.txt as AntConc corpus files.",
+        "The matching .index.txt contains metadata such as timestamps, comment depth, and flair.",
+        "CSV and JSONL preserve one record per document with its ID, even if the body contains blank lines.",
+        "Post titles can be retained as context without adding post bodies to the word-frequency corpus.",
+        "Depth 0 means a post; depth 1 means a top-level comment. Depth may be blank when the parent is absent.",
+        "Create a separate AntConc corpus for each main .txt file when comparing time windows.",
     ]
     if result.get("sampleTarget") is not None:
-        lines.append(f"按天抽样留下: {result.get('sampleKept')} / 目标 {result.get('sampleTarget')}")
-    lines.extend([
+        en.append(f"Sample retained: {result.get('sampleKept')} / target {result.get('sampleTarget')}")
+    en += ["", "3. Exported corpus files", "------------------------"]
+    en += [f"{item['name']}: {item['docs']} documents, {item['words']} words" for item in files]
+    en += [
         "",
-        "各文件",
-        "------",
-    ])
-    lines.extend(f"{item['name']}: {item['docs']} 条, {item['words']} 词" for item in files)
-    lines.extend([
-        "",
-        "楼层 0 是帖子，1 是顶层评论。父评论不在样本里时楼层留空。",
-        "AntConc 里为每个 txt 单独建一个语料库，用来比较半年、月份或 flair。",
-        "重跑: python3 shift_corpus.py --from-json query.json --out rerun",
-        "",
-    ])
+        "4. Reproduction",
+        "---------------",
+        "Run from the application folder (with shift_corpus_engine.py available):",
+        "python3 shift_corpus_engine.py --from-json query.json --out rerun",
+    ]
     if result.get("warning"):
-        lines.append("警告: " + str(result["warning"]))
+        en.append("Warning: " + str(result["warning"]))
     if result.get("error"):
-        lines.append("错误（结果可能不完整）: " + str(result["error"]))
-    lines.append("")
-    return "\n".join(lines)
+        en.append("Error (results may be incomplete): " + str(result["error"]))
+
+    zh = [
+        "ShiftCorpus — 采集输出说明",
+        "==========================",
+        "",
+        "1. 本次采集信息",
+        "----------------",
+        f"检索时间（UTC）：{record.get('retrievedAt', '')}",
+        "数据来源：Arctic Shift（https://arctic-shift.photon-reddit.com）",
+        f"版块：{communities_zh}",
+        f"日期范围（UTC，包含结束日）：{start_zh} 至 {end_zh}",
+        f"每段最多保留：{filters.get('maxKeep')}",
+        f"分别采集时间窗口：{bool(filters.get('halfFetch'))}",
+        f"时间分层抽样：{stratified}{sample_spec_zh}",
+        f"选定窗口：{only or '全部窗口'}",
+        f"输出切分方式：{filters.get('split') or 'half'}",
+        f"采集评论数：{result.get('comments', 0)}",
+        f"关联帖子记录数：{result.get('posts', 0)}",
+        f"导出语料词数：{result.get('words', 0)}",
+        f"帖子正文是否纳入语料：{include_posts}（默认仅纳入评论正文）",
+        "",
+        "2. 输出文件及使用方法",
+        "--------------------",
+        "每个主要语料 .txt 文件包含清洗后的文本，文本之间以空行分隔。",
+        "不要将 README.txt、*.index.txt 或 *.quotes.txt 导入 AntConc 作为语料。",
+        "同名 .index.txt 保存时间、评论层级及 flair 等元数据。",
+        "CSV 和 JSONL 逐条保存文本与 ID，即使正文包含空行也能准确对应。",
+        "帖子标题可作为上下文保留，而不必将帖子正文计入词频语料。",
+        "层级 0 表示帖子，层级 1 表示顶层评论；父评论缺失时层级可能留空。",
+        "按时间窗口比较时，建议在 AntConc 中为每个主要 .txt 文件单独建立语料库。",
+    ]
+    if result.get("sampleTarget") is not None:
+        zh.append(f"抽样保留：{result.get('sampleKept')} / 目标 {result.get('sampleTarget')}")
+    zh += ["", "3. 导出的语料文件", "------------------"]
+    zh += [f"{item['name']}：{item['docs']} 条文本，{item['words']} 词" for item in files]
+    zh += [
+        "",
+        "4. 复现采集",
+        "--------------",
+        "在包含 shift_corpus_engine.py 的程序目录运行：",
+        "python3 shift_corpus_engine.py --from-json query.json --out rerun",
+    ]
+    if result.get("warning"):
+        zh.append("警告：" + str(result["warning"]))
+    if result.get("error"):
+        zh.append("错误（结果可能不完整）：" + str(result["error"]))
+    return "\n".join(en + ["", "", "=" * 56, "", ""] + zh + [""])
 
 
 def build_record(args: argparse.Namespace, rows: list[dict], stats: dict, retrieved: str) -> dict:
