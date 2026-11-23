@@ -20,3 +20,7 @@ for after,before in [('2026-11-22','2026-01-01'),('bad','2026-10-01')]:
     except ValueError: pass
     else: raise AssertionError('invalid date accepted')
 print('All offline smoke checks passed')
+from shift_corpus_gui import UA, I18N
+from shift_corpus_engine import UA as ENGINE_UA
+assert UA == ENGINE_UA == 'ShiftCorpus-Research/1.0 (academic corpus collection)'
+assert I18N['zh'].keys() == I18N['en'].keys()

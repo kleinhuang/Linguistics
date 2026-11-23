@@ -30,7 +30,7 @@ from pathlib import Path
 
 API = "https://arctic-shift.photon-reddit.com/api/comments/search"
 POST_API = "https://arctic-shift.photon-reddit.com/api/posts/ids"
-UA = "ShiftCorpus/1.0 (academic corpus export for AntConc)"
+UA = "ShiftCorpus-Research/1.0 (academic corpus collection)"
 REMOVED = {"[deleted]", "[removed]", "[deleted by user]"}
 BOTS = {
     "automoderator",
