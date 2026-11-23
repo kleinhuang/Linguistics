@@ -399,7 +399,7 @@ class App(tk.Tk):
     def _left(self, frame):
         frame.grid_columnconfigure(0, weight=1)
         frame.grid_columnconfigure(1, weight=1)
-        ttk.Label(frame, text=self.t('range'), style='White.TLabel', font=(main_font, 12, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', padx=16, pady=(14, 6))
+        ttk.Label(frame, text=self.t('range'), style='White.TLabel', font=(ui_font(), 12, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', padx=16, pady=(14, 6))
         inner = tk.Frame(frame, bg=WHITE)
         inner.grid(row=1, column=0, columnspan=2, sticky='nsew', padx=16)
         inner.grid_columnconfigure(0, weight=1)
@@ -422,7 +422,7 @@ class App(tk.Tk):
         ttk.Label(only,text=self.t('only_hint'),style='WhiteMuted.TLabel').pack(anchor='w',pady=(4,0))
 
     def _right(self, frame):
-        ttk.Label(frame,text=self.t('filters'),style='White.TLabel',font=(main_font,12,'bold')).pack(anchor='w',padx=16,pady=(14,10))
+        ttk.Label(frame,text=self.t('filters'),style='White.TLabel',font=(ui_font(),12,'bold')).pack(anchor='w',padx=16,pady=(14,10))
         for key,text in [
             ('english',self.t('english')),
             ('exclude_bots',self.t('exclude_bots')),
