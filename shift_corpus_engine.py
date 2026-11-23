@@ -14,6 +14,9 @@ Examples
 
 from __future__ import annotations
 
+from tls_setup import configure_ca
+_CA_SOURCE = configure_ca()  # inherited by collector subprocess; verification stays on
+
 import argparse
 import csv
 import hashlib

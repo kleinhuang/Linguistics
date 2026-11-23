@@ -65,6 +65,19 @@ Accept: application/json
 
 **注意 / Note:** This app uses the public Arctic Shift service; availability and returned corpus size are not guaranteed. The daily sampling approach is time-stratified, not a uniform random sample of all comments. The **Stop** button may interrupt unwritten data. Do not disable TLS verification.
 
+
+### SSL certificate setup / SSL证书配置
+
+**中文：** 如果双击启动时出现 `CERTIFICATE_VERIFY_FAILED`，通常是终端设置的 `SSL_CERT_FILE` 没有传递到新启动的GUI。新版会在有安装 `certifi` 时自动使用其CA证书，同时保留服务器证书验证。请在**启动GUI所用的同一Python环境**安装：
+
+```bash
+python3 -m pip install --upgrade certifi
+```
+
+如果是python.org的Mac Python，也可以运行 `Applications/Python 3.14/Install Certificates.command`（版本目录按实际安装版本）。安装后关闭并重新启动GUI。不要使用 `ssl._create_unverified_context()`。
+
+**English:** When launching from a desktop shortcut, shell-exported `SSL_CERT_FILE` may not carry over. The app now automatically uses `certifi`'s trusted CA bundle if present without disabling TLS verification. Install `certifi` for the **same Python interpreter** used to launch the GUI, then restart. On python.org macOS builds, `Install Certificates.command` is another supported option. Do not bypass certificate checking.
+
 ## 5. 源代码验证 / Source tests
 
 ```bash

@@ -4,6 +4,9 @@ Standard-library only. No collection engine logic is changed here.
 """
 from __future__ import annotations
 
+from tls_setup import configure_ca
+_CA_SOURCE = configure_ca()  # inherited by collector subprocess; verification stays on
+
 import json
 import os
 import queue
@@ -605,7 +608,15 @@ class App(tk.Tk):
         except urllib.error.HTTPError as exc:
             self.queue.put(('api',(False,tr('api_http_error',code=exc.code,reason=exc.reason))))
         except Exception as exc:
-            self.queue.put(('api',(False,tr('api_failure',kind=type(exc).__name__,error=exc))))
+            message = str(exc)
+            if 'CERTIFICATE_VERIFY_FAILED' in message:
+                hint = ('请在同一Python环境运行 python3 -m pip install --upgrade certifi；'
+                        '若使用python.org的macOS安装版，也可运行 Install Certificates.command。'
+                        if lang == 'zh' else
+                        'Run python3 -m pip install --upgrade certifi in the same Python environment; '
+                        'on python.org macOS builds you can also run Install Certificates.command.')
+                message += ' | ' + hint
+            self.queue.put(('api',(False,tr('api_failure',kind=type(exc).__name__,error=message))))
 
     def _open_folder(self):
         path=Path(self.vars['out'].get()).expanduser()
