@@ -23,6 +23,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
+VERSION = "1.1.0"
 ROOT = Path(__file__).resolve().parent
 ENGINE = ROOT / "shift_corpus_engine.py"
 API_TEST_URL = "https://arctic-shift.photon-reddit.com/api/comments/search?subreddit=politics&limit=1"
@@ -32,6 +33,35 @@ def user_output_dir() -> Path:
     documents = Path.home() / 'Documents'
     base = documents if documents.is_dir() else Path.home()
     return base / 'ShiftCorpus_Output'
+
+
+def run_folder_name(values: dict[str, object], started_at: datetime) -> str:
+    """Readable, sortable, filesystem-safe name for one reproducible collection run."""
+    subreddit = re.sub(r'[^A-Za-z0-9_]', '', str(values['subreddit']).removeprefix('r/')).lower()
+    only = str(values.get('only_period') or '')
+    if only:
+        beginning, ending = only.split('_')
+        scope = 'single'
+    else:
+        beginning, ending = str(values['after']), str(values['before'])
+        scope = 'all'
+    dates = f"{beginning.replace('-', '')}-{ending.replace('-', '')}"
+    timestamp = started_at.strftime('%Y%m%d-%H%M%S')
+    return f"{subreddit}_{dates}_{scope}_{timestamp}"
+
+
+def create_run_directory(parent: Path, values: dict[str, object], started_at: datetime) -> Path:
+    """Create a never-overwritten folder, even if two starts share the same second."""
+    parent.mkdir(parents=True, exist_ok=True)
+    name = run_folder_name(values, started_at)
+    for suffix in range(10000):
+        result = parent / (name if suffix == 0 else f"{name}_{suffix:02d}")
+        try:
+            result.mkdir(exist_ok=False)
+            return result
+        except FileExistsError:
+            continue
+    raise OSError('Unable to create a unique output directory')
 
 
 def command_preview(args: list[str]) -> str:
@@ -79,7 +109,7 @@ ERROR_EN = {
 # UI strings only; subprocess output remains verbatim for reproducibility.
 I18N = {
     'zh': {
-        'window_title': 'ShiftCorpus · Reddit 语料采集器',
+        'window_title': 'ShiftCorpus GUI v1.1.0 · Reddit 语料采集器',
         'subtitle': 'Arctic Shift 研究语料采集 · 可视化参数、连接诊断和实时进度',
         'language': '语言 / Language', 'range': '采集范围与抽样', 'filters': '清洗与输出',
         'subreddit': 'Subreddit', 'seed': '随机种子 Seed', 'after': '开始日期（含）',
@@ -91,10 +121,10 @@ I18N = {
         'english': '仅保留英文评论', 'exclude_bots': '过滤已知 Bot 账号',
         'exclude_nsfw': '过滤 NSFW 标记', 'near_dup': '去掉近重复文本',
         'with_posts': '保存关联帖子标题作为上下文（不计入词频）',
-        'output_folder': '输出文件夹', 'browse': '浏览…',
-        'output_hint': '自动生成 AntConc TXT、索引、CSV、JSONL、query.json',
+        'output_folder': '输出根目录', 'browse': '浏览…',
+        'output_hint': '每次采集自动创建独立子文件夹，保存语料、索引、CSV、JSONL、query.json和运行日志',
         'command': '即将执行的命令', 'copy': '复制命令', 'start': '▶  开始采集',
-        'stop': '■  停止', 'test': '测试 API 连接', 'open_folder': '打开输出文件夹',
+        'stop': '■  停止', 'test': '测试 API 连接', 'open_folder': '打开本次输出文件夹',
         'progress': '运行进度', 'logs': '实时日志与诊断信息', 'clear': '清空日志',
         'ready': '就绪 · 等待开始', 'not_started': '尚未开始',
         'estimated': '预计 {windows} 个窗口 · 覆盖 {days} 天 · 计划采样 {target} 条评论（实际取决于 API）',
@@ -102,7 +132,7 @@ I18N = {
         'copied': '命令已复制到剪贴板。', 'select_folder': '选择语料输出文件夹',
         'bad_params': '采集参数有误', 'missing_engine': '缺少程序文件',
         'missing_engine_msg': '找不到采集核心：\n{engine}', 'cannot_create': '无法创建输出文件夹',
-        'launch': '启动采集：{time}', 'launch_error': '程序无法启动：{error}',
+        'launch': '启动采集：{time}', 'launch_error': '程序无法启动：{error}', 'run_directory': '本次输出：{path}',
         'collecting': '正在采集', 'read_error': '日志读取错误：{error}',
         'current_window': '当前窗口：{window}',
         'progress_detail': '{done}/{total} 窗口 · 当前窗口第 {day}/{days} 天',
@@ -120,7 +150,7 @@ I18N = {
         'argument_error': '输入参数无效：{error}',
     },
     'en': {
-        'window_title': 'ShiftCorpus · Reddit Corpus Collector',
+        'window_title': 'ShiftCorpus GUI v1.1.0 · Reddit Corpus Collector',
         'subtitle': 'Arctic Shift research collector · Settings, connection diagnostics, and live progress',
         'language': 'Language / 语言', 'range': 'Collection & sampling', 'filters': 'Filters & export',
         'subreddit': 'Subreddit', 'seed': 'Random seed', 'after': 'Start date (inclusive)',
@@ -132,10 +162,10 @@ I18N = {
         'english': 'English comments only', 'exclude_bots': 'Exclude known bots',
         'exclude_nsfw': 'Exclude NSFW content', 'near_dup': 'Remove near duplicates',
         'with_posts': 'Save parent post titles as context (excluded from frequency counts)',
-        'output_folder': 'Output folder', 'browse': 'Browse…',
-        'output_hint': 'Exports AntConc TXT, index, CSV, JSONL, and query.json',
+        'output_folder': 'Output root folder', 'browse': 'Browse…',
+        'output_hint': 'Each collection gets its own folder containing corpora, index, CSV, JSONL, query.json, and run log',
         'command': 'Command preview', 'copy': 'Copy command', 'start': '▶  Start collection',
-        'stop': '■  Stop', 'test': 'Test API connection', 'open_folder': 'Open output folder',
+        'stop': '■  Stop', 'test': 'Test API connection', 'open_folder': 'Open latest run folder',
         'progress': 'Collection progress', 'logs': 'Live log & diagnostics', 'clear': 'Clear log',
         'ready': 'Ready · Waiting to start', 'not_started': 'Not started',
         'estimated': 'Est. {windows} windows · {days} days · target {target} comments (subject to API availability)',
@@ -144,7 +174,7 @@ I18N = {
         'bad_params': 'Invalid collection parameters', 'missing_engine': 'Missing engine',
         'missing_engine_msg': 'Cannot find the collector engine:\n{engine}',
         'cannot_create': 'Cannot create output folder', 'launch': 'Collection started: {time}',
-        'launch_error': 'Unable to launch process: {error}', 'collecting': 'Collecting',
+        'launch_error': 'Unable to launch process: {error}', 'run_directory': 'Run folder: {path}', 'collecting': 'Collecting',
         'read_error': 'Log reader error: {error}', 'current_window': 'Current window: {window}',
         'progress_detail': '{done}/{total} windows · day {day}/{days} of current window',
         'completed': 'Complete', 'finished': 'Collection finished. Check the output folder.',
@@ -264,6 +294,8 @@ class App(tk.Tk):
         self.proc: subprocess.Popen | None = None
         self.test_busy = False
         self.stopping = False
+        self.last_run_dir: Path | None = None
+        self.run_started_at: datetime | None = None
         self.window_target = 0
         self.window_completed = 0
         self.day_progress = 0
@@ -513,6 +545,8 @@ class App(tk.Tk):
         try:
             values = self._values()
             cmd = make_command(values)
+            preview = Path(str(values['out'])).expanduser() / run_folder_name(values, datetime.now())
+            cmd[cmd.index('--out') + 1] = str(preview)
             text = command_preview(cmd)
             windows,target,days=estimate_windows(values['after'],values['before'],int(values['period_days']),int(values['sample_per_period']),values['partial_policy'])
             selected_id = str(values.get('only_period') or '').strip()
@@ -550,51 +584,79 @@ class App(tk.Tk):
     def _start(self):
         if self.proc and self.proc.poll() is None:
             return
+        values = self._values()
         try:
-            command=make_command(self._values())
+            command = make_command(values)
         except ValueError as exc:
-            messagebox.showerror(self.t('bad_params'),self.error(exc))
+            messagebox.showerror(self.t('bad_params'), self.error(exc))
             return
         if not ENGINE.is_file():
-            messagebox.showerror(self.t('missing_engine'),self.t('missing_engine_msg',engine=ENGINE))
+            messagebox.showerror(self.t('missing_engine'), self.t('missing_engine_msg', engine=ENGINE))
             return
-        dest=Path(str(self.vars['out'].get())).expanduser()
-        try: dest.mkdir(parents=True,exist_ok=True)
+        now = datetime.now().astimezone()
+        try:
+            dest = create_run_directory(Path(str(values['out'])).expanduser(), values, now)
         except OSError as exc:
-            messagebox.showerror(self.t('cannot_create'),str(exc));return
-        self.stopping=False
-        self.window_completed=0;self.day_progress=0;self.active_days=0
+            messagebox.showerror(self.t('cannot_create'), str(exc))
+            return
+        command[command.index('--out') + 1] = str(dest)
+        self.last_run_dir = dest
+        self.run_started_at = now
+        manifest = {
+            'app': 'ShiftCorpus GUI', 'version': VERSION,
+            'started_at': now.isoformat(), 'status': 'starting',
+            'run_folder': dest.name,
+            'settings': values, 'command': command,
+            'files_note': 'Corpus files are written at successful completion; collection.log is streaming.'
+        }
+        (dest / 'run_manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+        self.stopping = False
+        self.window_completed = 0
+        self.day_progress = 0
+        self.active_days = 0
         self.progress.configure(value=0)
-        self._log('\n'+'='*57)
-        self._log(self.t('launch',time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')),'good')
+        self._log('\n' + '=' * 57)
+        self._log(self.t('launch', time=now.strftime('%Y-%m-%d %H:%M:%S')), 'good')
+        self._log(self.t('run_directory', path=dest), 'good')
         self._log(command_preview(command))
         try:
             env = os.environ.copy()
             env['PYTHONIOENCODING'] = 'utf-8'
             popen_kw = {}
             if os.name == 'nt':
-                # Keep the GUI free of a second console window on Windows.
                 popen_kw['creationflags'] = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-            self.proc=subprocess.Popen(command,cwd=str(ROOT),stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT,text=True,encoding='utf-8',
-                           bufsize=1,errors='replace',env=env,**popen_kw)
+            self.proc = subprocess.Popen(command, cwd=str(ROOT), stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT, text=True, encoding='utf-8',
+                                         bufsize=1, errors='replace', env=env, **popen_kw)
         except OSError as exc:
-            self._log(self.t('launch_error',error=exc),'error');return
+            manifest['status'] = 'launch_failed'
+            manifest['error'] = str(exc)
+            (dest / 'run_manifest.json').write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+            (dest / 'collection.log').write_text(f'Launch failed: {exc}\n', encoding='utf-8')
+            self._log(self.t('launch_error', error=exc), 'error')
+            return
         self._status('collecting')
         self.start_button.configure(state='disabled')
         self.stop_button.configure(state='normal')
-        threading.Thread(target=self._read_output,args=(self.proc,),daemon=True).start()
+        threading.Thread(target=self._read_output, args=(self.proc, dest), daemon=True).start()
 
-    def _read_output(self,process):
+    def _read_output(self, process, run_dir: Path):
         try:
-            assert process.stdout is not None
-            for line in process.stdout:
-                self.queue.put(('line',line.rstrip('\r\n')))
+            with (run_dir / 'collection.log').open('a', encoding='utf-8') as logfile:
+                logfile.write(f'ShiftCorpus GUI v{VERSION}\n')
+                logfile.write(f'Started: {self.run_started_at.isoformat()}\n')
+                logfile.write(f'Output: {run_dir}\n\n')
+                logfile.flush()
+                assert process.stdout is not None
+                for line in process.stdout:
+                    logfile.write(line)
+                    logfile.flush()
+                    self.queue.put(('line', line.rstrip('\r\n')))
         except Exception as exc:
-            self.queue.put(('line',self.t('read_error',error=exc)))
+            self.queue.put(('line', f'Log capture error: {exc}'))
         finally:
-            code=process.wait()
-            self.queue.put(('done',code))
+            code = process.wait()
+            self.queue.put(('done', code))
 
     def _parse_progress(self,line):
         m=re.search(r'^period\s+(\d{4}-\d{2}-\d{2}_\d{4}-\d{2}-\d{2})',line)
@@ -636,6 +698,15 @@ class App(tk.Tk):
                 else:
                     self._status('failed',code=code)
                     self._log(self.t('failed_msg'),'error')
+                if self.last_run_dir:
+                    manifest_path = self.last_run_dir / 'run_manifest.json'
+                    try:
+                        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+                        manifest.update({'status': 'completed' if code == 0 else ('stopped' if self.stopping else 'failed'),
+                                         'exit_code': code, 'finished_at': datetime.now().astimezone().isoformat()})
+                        manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+                    except (OSError, ValueError) as exc:
+                        self._log(f'Could not finalize run_manifest.json: {exc}', 'warn')
                 self.start_button.configure(state='normal')
                 self.stop_button.configure(state='disabled')
                 self.proc=None
@@ -688,8 +759,8 @@ class App(tk.Tk):
             self.queue.put(('api',(False,tr('api_failure',kind=type(exc).__name__,error=message))))
 
     def _open_folder(self):
-        path=Path(self.vars['out'].get()).expanduser()
-        path.mkdir(parents=True,exist_ok=True)
+        path = self.last_run_dir or Path(self.vars['out'].get()).expanduser()
+        path.mkdir(parents=True, exist_ok=True)
         try:
             if sys.platform == 'darwin':
                 subprocess.Popen(['open', str(path)])
